@@ -33,6 +33,9 @@ No dependency on Neovim's bundled DiffTool or on Snacks for core functionality.
   It uses your scratch window settings and autowrite preference, and appears in
   `Snacks.scratch.select()`. Without Snacks, it opens a normal notes split.
 
+Changing `'wrap'` in either review split applies it to both, and it stays set
+when moving between files, so the scroll-bound sides stay aligned.
+
 `require("diffreview").active()` returns true while the review tab is current,
 for routing your own mappings (e.g. a general quickfix picker) to review actions.
 

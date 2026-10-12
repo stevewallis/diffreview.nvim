@@ -119,6 +119,10 @@ function M.select(key)
 		vim.api.nvim_win_set_buf(s.right_win, e.buf)
 		for _, win in ipairs({ s.left_win, s.right_win }) do
 			vim.api.nvim_win_call(win, vim.cmd.diffthis)
+			-- :diffthis turns wrap off; keep the review-wide wrap choice across files.
+			if s.wrap ~= nil then
+				vim.wo[win].wrap = s.wrap
+			end
 		end
 		vim.cmd.diffupdate()
 		s.current = key
@@ -418,6 +422,23 @@ function M.setup(opts)
 						end
 					end))
 				end
+			end
+		end,
+	})
+	-- Diff panes scroll-bind by screen row, so wrapping only one side misaligns them.
+	vim.api.nvim_create_autocmd("OptionSet", {
+		group = group,
+		pattern = "wrap",
+		callback = function()
+			local s = session
+			local win = vim.api.nvim_get_current_win()
+			if not s or s.switching or (win ~= s.left_win and win ~= s.right_win) then
+				return
+			end
+			s.wrap = vim.wo[win].wrap
+			local other = win == s.left_win and s.right_win or s.left_win
+			if vim.api.nvim_win_is_valid(other) and vim.wo[other].wrap ~= s.wrap then
+				vim.wo[other].wrap = s.wrap
 			end
 		end,
 	})
