@@ -23,20 +23,23 @@ No dependency on Neovim's bundled DiffTool or on Snacks for core functionality.
 ## Usage
 
 * `:DiffReview master`: compare master with tracked working-tree changes,
-  including staged changes. No argument defaults to HEAD.
+  including staged changes. No argument defaults to HEAD. Revisions
+  tab-complete branch, remote-branch and tag names.
 * `:DiffReview master HEAD`: compare two revisions.
 * `:DiffReviewDone`: toggle the current file's `[ ]` / `[x]` mark in place.
   Reviewed files stay visible by default. In pending-only mode, marking reviewed
   removes the entry and advances to the next pending file.
 * `:DiffReviewDoneNext` / `:DiffReviewDonePrev`: mark the current file reviewed,
-  then open the next / previous pending file, in either mode.
+  then open the next / previous pending file, in either mode. Like `]q` / `[q`,
+  these stop at the ends of the list rather than wrapping.
 
 No keys are mapped by default. `opts.keys` maps review actions only while a
 review is open, acting only in its tab; mappings they replace are restored when
-the review tab closes:
+the review tab closes. Actions: `done_next`, `done_prev`, `toggle`, `all`,
+`refresh`, `notes`, `pick`.
 
 ```lua
-opts = { keys = { done_next = "]r", done_prev = "[r" } }
+opts = { keys = { done_next = "]r", done_prev = "[r", toggle = "<leader>rr" } }
 ```
 * `:DiffReviewAll`: toggle all files / pending files.
 * `:DiffReviewRefresh`: query Git again, including newly changed tracked files.

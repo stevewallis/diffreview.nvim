@@ -8,6 +8,16 @@ function M.run(root, args, stdin)
 	return r.stdout
 end
 
+-- Branch, remote-branch and tag names, for completing revisions.
+function M.refs(root)
+	local out = M.run(root, { "for-each-ref", "--format=%(refname:short)", "refs/heads", "refs/remotes", "refs/tags" })
+	local refs = { "HEAD" }
+	for ref in vim.gsplit(out, "\n", { plain = true, trimempty = true }) do
+		refs[#refs + 1] = ref
+	end
+	return refs
+end
+
 function M.resolve(root, ref)
 	return vim.trim(M.run(root, { "rev-parse", "--verify", "--end-of-options", ref .. "^{commit}" }))
 end

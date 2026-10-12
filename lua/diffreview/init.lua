@@ -185,15 +185,23 @@ function M.refresh(initial_entries)
 	end
 end
 
-local function go_pending(s, index, dir)
-	for offset = 1, #s.entries do
+local function go_pending(s, index, dir, wrap)
+	local last = wrap and #s.entries or (dir > 0 and #s.entries - index or index - 1)
+	for offset = 1, last do
 		local e = s.entries[(index + dir * offset - 1) % #s.entries + 1]
 		if not e.done then
 			M.select(e.key)
 			return
 		end
 	end
-	vim.notify("DiffReview: all files reviewed")
+	local pending = #vim.tbl_filter(function(e)
+		return not e.done
+	end, s.entries)
+	if pending == 0 then
+		vim.notify("DiffReview: all files reviewed")
+	else
+		vim.notify(("DiffReview: no pending files %s this one (%d remaining)"):format(dir > 0 and "after" or "before", pending))
+	end
 end
 
 function M.toggle(key, advance)
@@ -227,7 +235,7 @@ function M.toggle(key, advance)
 			e.done = not e.done
 			publish(s)
 			if e.done and not s.all and advance ~= false then
-				go_pending(s, index, 1)
+				go_pending(s, index, 1, true)
 			end
 			return
 		end
@@ -235,7 +243,7 @@ function M.toggle(key, advance)
 end
 
 -- Mark the current file reviewed, then move to the next (dir = 1) or previous (dir = -1)
--- pending file, regardless of all/pending mode.
+-- pending file, regardless of all/pending mode. Like ]q / [q, it stops at the ends.
 function M.done_next(dir)
 	local s = current()
 	for index, e in ipairs(s.entries) do
@@ -351,6 +359,21 @@ local key_actions = {
 			M.done_next(-1)
 		end,
 	},
+	toggle = {
+		desc = "Toggle file reviewed",
+		fn = function()
+			M.toggle()
+		end,
+	},
+	all = { desc = "Toggle all/pending review files", fn = M.toggle_all },
+	refresh = {
+		desc = "Refresh diff review",
+		fn = function()
+			M.refresh()
+		end,
+	},
+	notes = { desc = "Review notes", fn = M.notes },
+	pick = { desc = "Pick review file", fn = M.pick },
 }
 
 -- Review keys exist only while a review is open, and act only in its tab.
@@ -470,7 +493,19 @@ function M.setup(opts)
 			assert(#args.fargs <= 2, "Usage: DiffReview [base [target]]")
 			M.open(args.fargs[1], args.fargs[2])
 		end),
-		{ nargs = "*" }
+		{
+			nargs = "*",
+			complete = function(lead, line)
+				-- Only base and target take revisions.
+				if #vim.split(line, "%s+", { trimempty = true }) > (lead == "" and 2 or 3) then
+					return {}
+				end
+				local ok, refs = pcall(git.refs, vim.fn.getcwd())
+				return ok and vim.tbl_filter(function(ref)
+					return vim.startswith(ref, lead)
+				end, refs) or {}
+			end,
+		}
 	)
 	local group = vim.api.nvim_create_augroup("diffreview", { clear = true })
 	vim.api.nvim_create_autocmd("TabClosed", {
