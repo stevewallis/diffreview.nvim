@@ -33,6 +33,9 @@ No dependency on Neovim's bundled DiffTool or on Snacks for core functionality.
   It uses your scratch window settings and autowrite preference, and appears in
   `Snacks.scratch.select()`. Without Snacks, it opens a normal notes split.
 
+`require("diffreview").active()` returns true while the review tab is current,
+for routing your own mappings (e.g. a general quickfix picker) to review actions.
+
 Use regular quickfix commands (`:cnext`, `:cprevious`, `:cc`, `:copen`) to navigate.
 Set `opts = { show_reviewed = false }` to start in pending-only mode instead.
 Reviews open in a separate tab; close it before starting another review. Existing

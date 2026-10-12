@@ -12,7 +12,7 @@ local function protect(fn)
 	end
 end
 
-local function active()
+local function current()
 	assert(session and vim.api.nvim_tabpage_is_valid(session.tab), "No active review")
 	return session
 end
@@ -87,7 +87,7 @@ local function publish(s)
 end
 
 function M.select(key)
-	local s = active()
+	local s = current()
 	local e
 	for _, item in ipairs(s.entries) do
 		if item.key == key then
@@ -144,7 +144,7 @@ local function save(s)
 end
 
 function M.refresh(initial_entries)
-	local s = active()
+	local s = current()
 	local entries = initial_entries or git.entries(s.root, s.base, s.target, { cache = s.git_cache })
 	local old = {}
 	for _, e in ipairs(s.entries) do
@@ -182,7 +182,7 @@ function M.refresh(initial_entries)
 end
 
 function M.toggle(key, advance)
-	local s = active()
+	local s = current()
 	if not key and vim.bo.buftype == "quickfix" then
 		local qf = vim.fn.getqflist({ id = 0, items = 1 })
 		local item = qf.items[vim.api.nvim_win_get_cursor(0)[1]]
@@ -227,13 +227,13 @@ function M.toggle(key, advance)
 end
 
 function M.toggle_all()
-	local s = active()
+	local s = current()
 	s.all = not s.all
 	publish(s)
 end
 
 function M.notes()
-	local s = active()
+	local s = current()
 	local ok, Snacks = pcall(require, "snacks")
 	if not ok or not Snacks.scratch then
 		vim.cmd("botright split " .. vim.fn.fnameescape(s.notesfile))
@@ -263,7 +263,7 @@ function M.notes()
 end
 
 function M.pick()
-	local s = active()
+	local s = current()
 	local ok, Snacks = pcall(require, "snacks")
 	assert(ok and Snacks.picker, "Snacks picker is not installed; use :copen")
 	return Snacks.picker({
@@ -364,6 +364,13 @@ end
 
 function M.state()
 	return session
+end
+
+-- Whether the current tab is the review tab; lets callers route their own keys to review actions.
+function M.active()
+	return session ~= nil
+		and vim.api.nvim_tabpage_is_valid(session.tab)
+		and vim.api.nvim_get_current_tabpage() == session.tab
 end
 
 function M.setup(opts)
