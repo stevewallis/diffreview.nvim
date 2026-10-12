@@ -1,7 +1,7 @@
 local M = {}
 local git = require("diffreview.git")
 local session
-local options = { auto_refresh = true, show_reviewed = true }
+local options = { auto_refresh = true, show_reviewed = true, keys = {} }
 
 local function protect(fn)
 	return function(...)
@@ -185,6 +185,17 @@ function M.refresh(initial_entries)
 	end
 end
 
+local function go_pending(s, index, dir)
+	for offset = 1, #s.entries do
+		local e = s.entries[(index + dir * offset - 1) % #s.entries + 1]
+		if not e.done then
+			M.select(e.key)
+			return
+		end
+	end
+	vim.notify("DiffReview: all files reviewed")
+end
+
 function M.toggle(key, advance)
 	local s = current()
 	if not key and vim.bo.buftype == "quickfix" then
@@ -216,15 +227,23 @@ function M.toggle(key, advance)
 			e.done = not e.done
 			publish(s)
 			if e.done and not s.all and advance ~= false then
-				for offset = 1, #s.entries do
-					local next_entry = s.entries[(index + offset - 1) % #s.entries + 1]
-					if not next_entry.done then
-						M.select(next_entry.key)
-						return
-					end
-				end
-				vim.notify("DiffReview: all files reviewed")
+				go_pending(s, index, 1)
 			end
+			return
+		end
+	end
+end
+
+-- Mark the current file reviewed, then move to the next (dir = 1) or previous (dir = -1)
+-- pending file, regardless of all/pending mode.
+function M.done_next(dir)
+	local s = current()
+	for index, e in ipairs(s.entries) do
+		if e.key == s.current then
+			if not e.done then
+				M.toggle(e.key, false)
+			end
+			go_pending(s, index, dir or 1)
 			return
 		end
 	end
@@ -319,6 +338,46 @@ function M.pick()
 	})
 end
 
+local key_actions = {
+	done_next = {
+		desc = "Mark reviewed, next pending file",
+		fn = function()
+			M.done_next(1)
+		end,
+	},
+	done_prev = {
+		desc = "Mark reviewed, previous pending file",
+		fn = function()
+			M.done_next(-1)
+		end,
+	},
+}
+
+-- Review keys exist only while a review is open, and act only in its tab.
+-- Global mappings they replace are restored when the review tab closes.
+local function map_keys(s)
+	s.saved_maps = {}
+	for action, lhs in pairs(options.keys) do
+		local saved = vim.fn.maparg(lhs, "n", false, true)
+		s.saved_maps[lhs] = saved.buffer ~= 1 and saved or {}
+		vim.keymap.set("n", lhs, function()
+			if M.active() then
+				protect(key_actions[action].fn)()
+			end
+		end, { desc = key_actions[action].desc })
+	end
+end
+
+local function unmap_keys(s)
+	for lhs, saved in pairs(s.saved_maps or {}) do
+		pcall(vim.keymap.del, "n", lhs)
+		if next(saved) then
+			vim.fn.mapset(saved)
+		end
+	end
+	s.saved_maps = nil
+end
+
 function M.open(base, target)
 	base = base or "HEAD"
 	local root = vim.trim(git.run(vim.fn.getcwd(), { "rev-parse", "--show-toplevel" }))
@@ -356,6 +415,7 @@ function M.open(base, target)
 	vim.cmd("rightbelow vsplit")
 	s.right_win = vim.api.nvim_get_current_win()
 	session = s
+	map_keys(s)
 	M.refresh(entries)
 	vim.cmd("botright copen")
 	local first = visible(s)[1]
@@ -379,12 +439,21 @@ end
 
 function M.setup(opts)
 	options = vim.tbl_extend("force", options, opts or {})
+	for action in pairs(options.keys) do
+		assert(key_actions[action], "DiffReview: unknown key action " .. action)
+	end
 	local commands = {
 		DiffReviewDone = M.toggle,
 		DiffReviewRefresh = M.refresh,
 		DiffReviewAll = M.toggle_all,
 		DiffReviewPick = M.pick,
 		DiffReviewNotes = M.notes,
+		DiffReviewDoneNext = function()
+			M.done_next(1)
+		end,
+		DiffReviewDonePrev = function()
+			M.done_next(-1)
+		end,
 	}
 	for name, fn in pairs(commands) do
 		vim.api.nvim_create_user_command(
@@ -404,6 +473,14 @@ function M.setup(opts)
 		{ nargs = "*" }
 	)
 	local group = vim.api.nvim_create_augroup("diffreview", { clear = true })
+	vim.api.nvim_create_autocmd("TabClosed", {
+		group = group,
+		callback = function()
+			if session and not vim.api.nvim_tabpage_is_valid(session.tab) then
+				unmap_keys(session)
+			end
+		end,
+	})
 	vim.api.nvim_create_autocmd("BufWinEnter", {
 		group = group,
 		callback = function(ev)

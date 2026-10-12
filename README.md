@@ -3,6 +3,9 @@
 A small Git review workspace for Neovim 0.11+: diff splits, persistent reviewed
 marks, quickfix navigation, and an optional Snacks picker.
 
+I liked using `git difftool --dir-diff` for reviews, but was getting on large reviews
+about what I'd done, so wanted a way to mark a file as reviewed (like on github prs).
+
 ## Install with Lazy
 
 ```lua
@@ -25,6 +28,16 @@ No dependency on Neovim's bundled DiffTool or on Snacks for core functionality.
 * `:DiffReviewDone`: toggle the current file's `[ ]` / `[x]` mark in place.
   Reviewed files stay visible by default. In pending-only mode, marking reviewed
   removes the entry and advances to the next pending file.
+* `:DiffReviewDoneNext` / `:DiffReviewDonePrev`: mark the current file reviewed,
+  then open the next / previous pending file, in either mode.
+
+No keys are mapped by default. `opts.keys` maps review actions only while a
+review is open, acting only in its tab; mappings they replace are restored when
+the review tab closes:
+
+```lua
+opts = { keys = { done_next = "]r", done_prev = "[r" } }
+```
 * `:DiffReviewAll`: toggle all files / pending files.
 * `:DiffReviewRefresh`: query Git again, including newly changed tracked files.
 * `:DiffReviewPick`: searchable Snacks picker. Ctrl-D toggles a mark; Ctrl-A

@@ -204,5 +204,50 @@ assert(calls <= 3, "Marking should only query the selected comparison")
 review.toggle()
 equal(s.entries[1].done, false)
 git.run = run_git
+-- Mark-and-move skips reviewed files in both directions, even in all-files mode.
+review.done_next(1)
+equal(s.entries[1].done, true)
+equal(s.current, s.entries[2].key)
+review.done_next(1)
+equal(s.current, s.entries[3].key)
+review.toggle(s.entries[1].key, false)
+review.done_next(-1)
+equal(s.entries[3].done, true)
+equal(s.current, s.entries[1].key)
+review.done_next(1)
+equal(s.entries[1].done, true)
+equal(s.current, s.entries[1].key)
+-- Configured keys exist only during a review, act only in its tab, and restore prior mappings.
+vim.cmd.tabclose()
+vim.keymap.set("n", "]r", "<Nop>", { desc = "user mapping" })
+review.setup({
+	state_dir = root .. "/state",
+	auto_refresh = false,
+	show_reviewed = true,
+	keys = { done_next = "]r", done_prev = "[r" },
+})
+equal(pcall(review.setup, { keys = { typo = "]z" } }), false)
+review.setup({
+	state_dir = root .. "/state",
+	auto_refresh = false,
+	show_reviewed = true,
+	keys = { done_next = "]r", done_prev = "[r" },
+})
+equal(vim.fn.maparg("[r", "n"), "")
+review.open("HEAD")
+s = review.state()
+review.toggle(s.entries[1].key, false)
+review.select(s.entries[2].key)
+vim.api.nvim_feedkeys(vim.keycode("]r"), "x", false)
+equal(s.current, s.entries[1].key)
+review.toggle(s.entries[3].key, false)
+vim.cmd.tabnew()
+vim.api.nvim_feedkeys(vim.keycode("]r"), "x", false)
+equal(s.current, s.entries[1].key)
+equal(s.entries[3].done, false)
+vim.api.nvim_set_current_tabpage(s.tab)
+vim.cmd.tabclose()
+equal(vim.fn.maparg("]r", "n", false, true).desc, "user mapping")
+equal(vim.fn.maparg("[r", "n"), "")
 print("DiffReview integration tests passed")
 vim.cmd("qa!")
